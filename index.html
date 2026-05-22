@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en" data-app-version="live-handoff-2">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#07070a">
+    <title>TikTok Lens Port</title>
+    <link rel="manifest" href="./site.webmanifest">
+    <link rel="stylesheet" href="./styles.css?v=live-handoff-2">
+    <script async src="https://www.tiktok.com/embed.js"></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="scan-pane" aria-labelledby="app-title">
+        <div class="status-bar">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="statusText">Ready</span>
+        </div>
+
+        <header class="topline">
+          <p class="eyebrow">Meta Display Web App</p>
+          <h1 id="app-title">TikTok Scanner</h1>
+        </header>
+
+        <div class="scanner-frame">
+          <video id="camera" playsinline muted></video>
+          <div class="scanner-mask" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <canvas id="snapshot" hidden></canvas>
+          <div class="camera-empty" id="cameraEmpty">
+            <strong>Scan a QR code</strong>
+            <span>or paste a TikTok link below</span>
+          </div>
+        </div>
+
+        <div class="controls" aria-label="Scanner controls">
+          <button id="scanButton" type="button" class="primary-button">
+            Start Scan
+          </button>
+          <button id="stopButton" type="button" class="icon-button" aria-label="Stop camera" title="Stop camera">
+            Stop
+          </button>
+        </div>
+
+        <form id="linkForm" class="link-form">
+          <label for="tiktokUrl">TikTok URL</label>
+          <div class="input-row">
+            <input id="tiktokUrl" name="tiktokUrl" type="url" inputmode="url" autocomplete="off" placeholder="https://www.tiktok.com/@user/video/..." required>
+            <button type="submit" aria-label="Load TikTok">Go</button>
+          </div>
+          <p id="errorText" class="error-text" role="alert"></p>
+        </form>
+      </section>
+
+      <section class="preview-pane" aria-labelledby="preview-title">
+        <div class="preview-header">
+          <div>
+            <p class="eyebrow">Glance Preview</p>
+            <h2 id="preview-title">No TikTok loaded</h2>
+          </div>
+          <button id="clearButton" type="button" class="icon-button" aria-label="Clear preview" title="Clear preview">Clear</button>
+        </div>
+
+        <div id="embedHost" class="embed-host">
+          <div class="empty-state">
+            <strong>Allowed integration</strong>
+            <span>Uses TikTok embeds for public videos, profiles, and supported TikTok web links. Login Kit or Display API can be added once app credentials and scopes are approved.</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="./app.js?v=live-handoff-2" type="module"></script>
+  </body>
+</html>

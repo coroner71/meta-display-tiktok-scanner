@@ -1,0 +1,10 @@
+{
+  "name": "TikTok Lens Port",
+  "short_name": "TikTok Lens",
+  "description": "Meta Display-friendly TikTok web launcher with QR scanning, embeds, and web handoff.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#07070a",
+  "theme_color": "#07070a"
+}
