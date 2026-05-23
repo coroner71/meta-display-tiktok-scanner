@@ -1,58 +1,35 @@
-const camera = document.querySelector("#camera");
-const snapshot = document.querySelector("#snapshot");
-const cameraEmpty = document.querySelector("#cameraEmpty");
-const scanButton = document.querySelector("#scanButton");
-const stopButton = document.querySelector("#stopButton");
-const linkForm = document.querySelector("#linkForm");
-const urlInput = document.querySelector("#tiktokUrl");
 const embedHost = document.querySelector("#embedHost");
-const previewTitle = document.querySelector("#preview-title");
-const clearButton = document.querySelector("#clearButton");
 const statusText = document.querySelector("#statusText");
-const errorText = document.querySelector("#errorText");
+const feedMeta = document.querySelector("#feedMeta");
+const previousButton = document.querySelector("#previousButton");
+const nextButton = document.querySelector("#nextButton");
+const autoButton = document.querySelector("#autoButton");
 
-let stream;
-let scanTimer;
-let detector;
+const feedItems = [
+  {
+    url: "https://www.tiktok.com/@brookemonk_/video/7621285419719691550",
+    title: "Brooke Monk"
+  },
+  {
+    url: "https://www.tiktok.com/@tiktok/video/7122145258645425454",
+    title: "TikTok"
+  }
+];
 
-const tiktokHostPattern = /(^|\.)tiktok\.com$/i;
-const deepLinkParam = "tiktokUrl";
-const defaultTikTokUrl = "https://www.tiktok.com/";
-const scanningEnabled = false;
-const videoPathPattern = /^\/@([^/]+)\/video\/(\d+)\/?$/;
-const profilePathPattern = /^\/@([^/]+)\/?$/;
-const livePathPattern = /^\/@([^/]+)\/live\/?$/;
-const autoLaunchDelay = 1400;
+const autoAdvanceDelay = 18000;
+let currentIndex = 0;
+let autoAdvance = true;
+let autoTimer;
 
 function setStatus(message) {
   statusText.textContent = message;
 }
 
-function setError(message = "") {
-  errorText.textContent = message;
-}
-
-function getErrorMessage(error, fallback) {
-  if (error && typeof error.message === "string" && error.message) {
-    return error.message;
-  }
-
-  return fallback;
-}
-
-function cameraIsAvailable() {
-  return Boolean(
-    navigator.mediaDevices &&
-      typeof navigator.mediaDevices.getUserMedia === "function"
-  );
-}
-
 function normalizeTikTokUrl(rawValue) {
-  const trimmed = rawValue.trim();
-  const url = new URL(trimmed);
+  const url = new URL(rawValue);
 
-  if (!tiktokHostPattern.test(url.hostname)) {
-    throw new Error("That link is not on tiktok.com.");
+  if (!/(^|\.)tiktok\.com$/i.test(url.hostname)) {
+    throw new Error("Feed item is not a TikTok URL.");
   }
 
   url.searchParams.delete("is_from_webapp");
@@ -60,35 +37,9 @@ function normalizeTikTokUrl(rawValue) {
   return url.toString();
 }
 
-function getTikTokTarget(tiktokUrl) {
-  const url = new URL(tiktokUrl);
-  const videoMatch = url.pathname.match(videoPathPattern);
-  const profileMatch = url.pathname.match(profilePathPattern);
-  const liveMatch = url.pathname.match(livePathPattern);
-
-  if (videoMatch) {
-    return {
-      type: "video",
-      username: videoMatch[1],
-      videoId: videoMatch[2]
-    };
-  }
-
-  if (profileMatch) {
-    return {
-      type: "profile",
-      username: profileMatch[1]
-    };
-  }
-
-  if (liveMatch) {
-    return {
-      type: "live",
-      username: liveMatch[1]
-    };
-  }
-
-  return { type: "link" };
+function getVideoId(tiktokUrl) {
+  const match = new URL(tiktokUrl).pathname.match(/^\/@[^/]+\/video\/(\d+)\/?$/);
+  return match ? match[1] : "";
 }
 
 function refreshTikTokEmbed() {
@@ -103,248 +54,67 @@ function refreshTikTokEmbed() {
   document.body.appendChild(script);
 }
 
-function renderTikTokHandoff(tiktokUrl, username) {
-  previewTitle.textContent = "TikTok Live";
-  urlInput.value = tiktokUrl;
-  embedHost.innerHTML = `
-    <div class="handoff-state">
-      <strong>@${username} is live</strong>
-      <span>Opening TikTok Web for scrolling.</span>
-      <a class="open-link" href="${tiktokUrl}">Browse TikTok Web</a>
-      <a class="secondary-link" target="_blank" rel="noopener noreferrer" href="${tiktokUrl}">Open in new tab</a>
-    </div>
-  `;
-  setStatus("Launching");
-  scheduleTikTokLaunch(tiktokUrl);
-}
+function renderFeedItem(index) {
+  const item = feedItems[index];
+  const safeUrl = normalizeTikTokUrl(item.url);
+  const videoId = getVideoId(safeUrl);
 
-function renderTikTokWebLaunch(tiktokUrl) {
-  previewTitle.textContent = "TikTok Web";
-  urlInput.value = tiktokUrl;
-  embedHost.innerHTML = `
-    <div class="handoff-state">
-      <strong>Opening TikTok</strong>
-      <span>Launching the TikTok website for scrolling.</span>
-      <a class="open-link" href="${tiktokUrl}">Open TikTok Web</a>
-    </div>
-  `;
-  setStatus("Launching");
-  scheduleTikTokLaunch(tiktokUrl);
-}
-
-function renderEmbed(tiktokUrl) {
-  const safeUrl = normalizeTikTokUrl(tiktokUrl);
-  const target = getTikTokTarget(safeUrl);
-
-  setError();
-  urlInput.value = safeUrl;
-  embedHost.innerHTML = "";
-
-  if (safeUrl === "https://www.tiktok.com/") {
-    renderTikTokWebLaunch(safeUrl);
-    return;
-  }
-
-  if (target.type === "live") {
-    renderTikTokHandoff(safeUrl, target.username);
-    return;
-  }
-
-  previewTitle.textContent = "TikTok loaded";
-
-  if (target.type === "video") {
+  if (!videoId) {
     embedHost.innerHTML = `
-      <blockquote class="tiktok-embed" cite="${safeUrl}" data-video-id="${target.videoId}">
-        <section>
-          <a target="_blank" rel="noopener noreferrer" href="${safeUrl}">Open on TikTok</a>
-        </section>
-      </blockquote>
-    `;
-  } else if (target.type === "profile") {
-    embedHost.innerHTML = `
-      <blockquote class="tiktok-embed" cite="${safeUrl}" data-unique-id="${target.username}" data-embed-type="creator">
-        <section>
-          <a target="_blank" rel="noopener noreferrer" href="${safeUrl}">Open on TikTok</a>
-        </section>
-      </blockquote>
-    `;
-  } else {
-    embedHost.innerHTML = `
-      <div class="handoff-state">
-        <strong>TikTok link ready</strong>
-        <span>Opening TikTok Web for scrolling.</span>
-        <a class="open-link" href="${safeUrl}">Browse TikTok Web</a>
-        <a class="secondary-link" target="_blank" rel="noopener noreferrer" href="${safeUrl}">Open in new tab</a>
+      <div class="empty-state">
+        <strong>Unsupported TikTok link</strong>
+        <span>This feed item is not a public TikTok video URL.</span>
       </div>
     `;
-    setStatus("Launching");
-    scheduleTikTokLaunch(safeUrl);
+    setStatus("Unsupported");
     return;
   }
 
-  refreshTikTokEmbed();
-  setStatus("Loaded");
-}
-
-function scheduleTikTokLaunch(tiktokUrl) {
-  window.setTimeout(() => {
-    window.location.assign(tiktokUrl);
-  }, autoLaunchDelay);
-}
-
-function loadDeepLinkedTikTok() {
-  const params = new URLSearchParams(window.location.search);
-  const deepLinkedUrl = params.get(deepLinkParam) || defaultTikTokUrl;
-
-  try {
-    renderEmbed(deepLinkedUrl);
-  } catch (error) {
-    urlInput.value = deepLinkedUrl;
-    setStatus("Check link");
-    setError(error.message);
-  }
-}
-
-function clearPreview() {
-  previewTitle.textContent = "No TikTok loaded";
   embedHost.innerHTML = `
-    <div class="empty-state">
-      <strong>Allowed integration</strong>
-      <span>Uses TikTok embeds for public videos, profiles, and supported TikTok web links. Login Kit or Display API can be added once app credentials and scopes are approved.</span>
-    </div>
+    <blockquote class="tiktok-embed" cite="${safeUrl}" data-video-id="${videoId}">
+      <section>
+        <a target="_blank" rel="noopener noreferrer" href="${safeUrl}">${item.title}</a>
+      </section>
+    </blockquote>
   `;
-  setError();
-  setStatus("Ready");
+  feedMeta.textContent = `${item.title} - ${index + 1} of ${feedItems.length}`;
+  setStatus(autoAdvance ? "Auto scanning" : "Paused");
+  refreshTikTokEmbed();
+  scheduleAutoAdvance();
 }
 
-async function getDetector() {
-  if (!("BarcodeDetector" in window)) {
-    throw new Error("This browser does not support QR scanning. Paste a TikTok URL instead.");
-  }
+function scheduleAutoAdvance() {
+  window.clearTimeout(autoTimer);
 
-  if (!detector) {
-    let supportedFormats = [];
-
-    if (typeof window.BarcodeDetector.getSupportedFormats === "function") {
-      supportedFormats = await window.BarcodeDetector.getSupportedFormats();
-    }
-
-    if (!supportedFormats.includes("qr_code")) {
-      throw new Error("QR scanning is unavailable here. Paste a TikTok URL instead.");
-    }
-
-    detector = new window.BarcodeDetector({ formats: ["qr_code"] });
-  }
-
-  return detector;
-}
-
-async function scanFrame() {
-  try {
-    if (!stream || camera.readyState < 2) {
-      return;
-    }
-
-    const barcodeDetector = await getDetector();
-    const width = camera.videoWidth;
-    const height = camera.videoHeight;
-
-    if (!width || !height) {
-      return;
-    }
-
-    snapshot.width = width;
-    snapshot.height = height;
-    const context = snapshot.getContext("2d", { willReadFrequently: true });
-
-    if (!context) {
-      throw new Error("QR scanning canvas is unavailable. Paste a TikTok URL instead.");
-    }
-
-    context.drawImage(camera, 0, 0, width, height);
-
-    const codes = await barcodeDetector.detect(snapshot);
-    const hit = codes.find((code) => code.rawValue && code.rawValue.includes("tiktok.com"));
-
-    if (hit) {
-      renderEmbed(hit.rawValue);
-      stopCamera();
-    }
-  } catch (error) {
-    stopCamera();
-    setStatus("Manual entry");
-    setError(getErrorMessage(error, "QR scanning stopped. Paste a TikTok URL instead."));
-  }
-}
-
-async function startCamera() {
-  if (!scanningEnabled) {
-    setStatus("Launching");
-    setError("QR scanning is disabled for the glasses build.");
+  if (!autoAdvance || feedItems.length < 2) {
     return;
   }
 
-  try {
-    setError();
-
-    if (!cameraIsAvailable()) {
-      throw new Error("Camera access is unavailable in this web app container. Paste a TikTok URL instead.");
-    }
-
-    await getDetector();
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment" },
-      audio: false
-    });
-    camera.srcObject = stream;
-    await camera.play();
-    cameraEmpty.hidden = true;
-    setStatus("Scanning");
-    scanTimer = window.setInterval(scanFrame, 700);
-  } catch (error) {
-    setStatus("Manual entry");
-    setError(getErrorMessage(error, "Camera scanning is unavailable. Paste a TikTok URL instead."));
-    stopCamera();
-  }
+  autoTimer = window.setTimeout(() => {
+    showNext();
+  }, autoAdvanceDelay);
 }
 
-function stopCamera() {
-  if (scanTimer) {
-    window.clearInterval(scanTimer);
-    scanTimer = undefined;
-  }
-
-  if (stream) {
-    stream.getTracks().forEach((track) => track.stop());
-    stream = undefined;
-  }
-
-  camera.srcObject = null;
-  cameraEmpty.hidden = false;
-  if (statusText.textContent === "Scanning") {
-    setStatus("Stopped");
-  }
+function showNext() {
+  currentIndex = (currentIndex + 1) % feedItems.length;
+  renderFeedItem(currentIndex);
 }
 
-scanButton.addEventListener("click", startCamera);
-stopButton.addEventListener("click", stopCamera);
-clearButton.addEventListener("click", clearPreview);
-
-linkForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-
-  try {
-    renderEmbed(urlInput.value);
-  } catch (error) {
-    setStatus("Check link");
-    setError(error.message);
-  }
-});
-
-window.addEventListener("pagehide", stopCamera);
-loadDeepLinkedTikTok();
-
-if (!scanningEnabled || !cameraIsAvailable() || !("BarcodeDetector" in window)) {
-  scanButton.disabled = true;
-  scanButton.textContent = "Scanner Disabled";
+function showPrevious() {
+  currentIndex = (currentIndex - 1 + feedItems.length) % feedItems.length;
+  renderFeedItem(currentIndex);
 }
+
+function toggleAutoAdvance() {
+  autoAdvance = !autoAdvance;
+  autoButton.textContent = autoAdvance ? "Auto scan on" : "Auto scan off";
+  autoButton.setAttribute("aria-pressed", String(autoAdvance));
+  setStatus(autoAdvance ? "Auto scanning" : "Paused");
+  scheduleAutoAdvance();
+}
+
+previousButton.addEventListener("click", showPrevious);
+nextButton.addEventListener("click", showNext);
+autoButton.addEventListener("click", toggleAutoAdvance);
+
+renderFeedItem(currentIndex);
