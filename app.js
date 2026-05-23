@@ -1,120 +1,94 @@
-const embedHost = document.querySelector("#embedHost");
+const video = document.querySelector("#feedVideo");
+const videoFallback = document.querySelector("#videoFallback");
+const fallbackText = document.querySelector("#fallbackText");
 const statusText = document.querySelector("#statusText");
 const feedMeta = document.querySelector("#feedMeta");
 const previousButton = document.querySelector("#previousButton");
 const nextButton = document.querySelector("#nextButton");
-const autoButton = document.querySelector("#autoButton");
+const playButton = document.querySelector("#playButton");
 
 const feedItems = [
   {
-    url: "https://www.tiktok.com/@brookemonk_/video/7621285419719691550",
-    title: "Brooke Monk"
+    title: "Flower one",
+    src: "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4"
   },
   {
-    url: "https://www.tiktok.com/@tiktok/video/7122145258645425454",
-    title: "TikTok"
+    title: "Flower two",
+    src: "https://www.w3schools.com/html/mov_bbb.mp4"
   }
 ];
 
-const autoAdvanceDelay = 18000;
 let currentIndex = 0;
-let autoAdvance = true;
-let autoTimer;
 
 function setStatus(message) {
   statusText.textContent = message;
 }
 
-function normalizeTikTokUrl(rawValue) {
-  const url = new URL(rawValue);
-
-  if (!/(^|\.)tiktok\.com$/i.test(url.hostname)) {
-    throw new Error("Feed item is not a TikTok URL.");
-  }
-
-  url.searchParams.delete("is_from_webapp");
-  url.searchParams.delete("sender_device");
-  return url.toString();
+function updateMeta(item) {
+  feedMeta.textContent = `${item.title} - ${currentIndex + 1} of ${feedItems.length}`;
 }
 
-function getVideoId(tiktokUrl) {
-  const match = new URL(tiktokUrl).pathname.match(/^\/@[^/]+\/video\/(\d+)\/?$/);
-  return match ? match[1] : "";
+function showFallback(message) {
+  video.hidden = true;
+  videoFallback.hidden = false;
+  fallbackText.textContent = message;
+  setStatus("Load failed");
 }
 
-function refreshTikTokEmbed() {
-  if (window.tiktokEmbedLoad) {
-    window.tiktokEmbedLoad();
-    return;
+async function playCurrentVideo() {
+  const item = feedItems[currentIndex];
+
+  videoFallback.hidden = true;
+  video.hidden = false;
+  video.src = item.src;
+  video.load();
+  updateMeta(item);
+  setStatus("Loading");
+
+  try {
+    await video.play();
+    playButton.textContent = "Pause";
+    setStatus("Playing");
+  } catch (error) {
+    playButton.textContent = "Play";
+    setStatus("Tap play");
   }
-
-  const script = document.createElement("script");
-  script.src = "https://www.tiktok.com/embed.js";
-  script.async = true;
-  document.body.appendChild(script);
-}
-
-function renderFeedItem(index) {
-  const item = feedItems[index];
-  const safeUrl = normalizeTikTokUrl(item.url);
-  const videoId = getVideoId(safeUrl);
-
-  if (!videoId) {
-    embedHost.innerHTML = `
-      <div class="empty-state">
-        <strong>Unsupported TikTok link</strong>
-        <span>This feed item is not a public TikTok video URL.</span>
-      </div>
-    `;
-    setStatus("Unsupported");
-    return;
-  }
-
-  embedHost.innerHTML = `
-    <blockquote class="tiktok-embed" cite="${safeUrl}" data-video-id="${videoId}">
-      <section>
-        <a target="_blank" rel="noopener noreferrer" href="${safeUrl}">${item.title}</a>
-      </section>
-    </blockquote>
-  `;
-  feedMeta.textContent = `${item.title} - ${index + 1} of ${feedItems.length}`;
-  setStatus(autoAdvance ? "Auto scanning" : "Paused");
-  refreshTikTokEmbed();
-  scheduleAutoAdvance();
-}
-
-function scheduleAutoAdvance() {
-  window.clearTimeout(autoTimer);
-
-  if (!autoAdvance || feedItems.length < 2) {
-    return;
-  }
-
-  autoTimer = window.setTimeout(() => {
-    showNext();
-  }, autoAdvanceDelay);
 }
 
 function showNext() {
   currentIndex = (currentIndex + 1) % feedItems.length;
-  renderFeedItem(currentIndex);
+  playCurrentVideo();
 }
 
 function showPrevious() {
   currentIndex = (currentIndex - 1 + feedItems.length) % feedItems.length;
-  renderFeedItem(currentIndex);
+  playCurrentVideo();
 }
 
-function toggleAutoAdvance() {
-  autoAdvance = !autoAdvance;
-  autoButton.textContent = autoAdvance ? "Auto scan on" : "Auto scan off";
-  autoButton.setAttribute("aria-pressed", String(autoAdvance));
-  setStatus(autoAdvance ? "Auto scanning" : "Paused");
-  scheduleAutoAdvance();
+async function togglePlayback() {
+  if (video.paused) {
+    try {
+      await video.play();
+      playButton.textContent = "Pause";
+      setStatus("Playing");
+    } catch (error) {
+      showFallback("This browser blocked video playback.");
+    }
+    return;
+  }
+
+  video.pause();
+  playButton.textContent = "Play";
+  setStatus("Paused");
 }
 
+video.addEventListener("error", () => {
+  showFallback("The current video URL could not be loaded.");
+});
+
+video.addEventListener("ended", showNext);
 previousButton.addEventListener("click", showPrevious);
 nextButton.addEventListener("click", showNext);
-autoButton.addEventListener("click", toggleAutoAdvance);
+playButton.addEventListener("click", togglePlayback);
 
-renderFeedItem(currentIndex);
+playCurrentVideo();
