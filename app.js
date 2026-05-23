@@ -17,7 +17,7 @@ let detector;
 
 const tiktokHostPattern = /(^|\.)tiktok\.com$/i;
 const deepLinkParam = "tiktokUrl";
-const defaultTikTokUrl = "https://www.tiktok.com/@daroodkanool10/live";
+const defaultTikTokUrl = "https://www.tiktok.com/";
 const scanningEnabled = false;
 const videoPathPattern = /^\/@([^/]+)\/video\/(\d+)\/?$/;
 const profilePathPattern = /^\/@([^/]+)\/?$/;
@@ -118,6 +118,20 @@ function renderTikTokHandoff(tiktokUrl, username) {
   scheduleTikTokLaunch(tiktokUrl);
 }
 
+function renderTikTokWebLaunch(tiktokUrl) {
+  previewTitle.textContent = "TikTok Web";
+  urlInput.value = tiktokUrl;
+  embedHost.innerHTML = `
+    <div class="handoff-state">
+      <strong>Opening TikTok</strong>
+      <span>Launching the TikTok website for scrolling.</span>
+      <a class="open-link" href="${tiktokUrl}">Open TikTok Web</a>
+    </div>
+  `;
+  setStatus("Launching");
+  scheduleTikTokLaunch(tiktokUrl);
+}
+
 function renderEmbed(tiktokUrl) {
   const safeUrl = normalizeTikTokUrl(tiktokUrl);
   const target = getTikTokTarget(safeUrl);
@@ -125,6 +139,11 @@ function renderEmbed(tiktokUrl) {
   setError();
   urlInput.value = safeUrl;
   embedHost.innerHTML = "";
+
+  if (safeUrl === "https://www.tiktok.com/") {
+    renderTikTokWebLaunch(safeUrl);
+    return;
+  }
 
   if (target.type === "live") {
     renderTikTokHandoff(safeUrl, target.username);
