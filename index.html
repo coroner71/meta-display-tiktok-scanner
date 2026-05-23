@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en" data-app-version="native-video-feed-1">
+<html lang="en" data-app-version="random-feed-1">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#07070a">
     <title>Lens Video Feed</title>
     <link rel="manifest" href="./site.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=native-video-feed-1">
+    <link rel="stylesheet" href="./styles.css?v=random-feed-1">
   </head>
   <body>
     <main class="feed-shell">
@@ -24,6 +24,10 @@
 
         <div class="video-host">
           <video id="feedVideo" playsinline muted autoplay loop preload="metadata"></video>
+          <button id="loadButton" type="button" class="load-card">
+            <strong id="loadTitle">Video ready</strong>
+            <span>Press to load and play</span>
+          </button>
           <div id="videoFallback" class="empty-state" hidden>
             <strong>Video unavailable</strong>
             <span id="fallbackText">This video could not be loaded.</span>
@@ -33,6 +37,7 @@
         <div class="feed-controls" aria-label="Feed controls">
           <button id="previousButton" type="button">Previous</button>
           <button id="playButton" type="button">Pause</button>
+          <button id="randomButton" type="button">Random</button>
           <button id="nextButton" type="button">Next</button>
         </div>
 
@@ -40,6 +45,6 @@
       </section>
     </main>
 
-    <script src="./app.js?v=native-video-feed-1" type="module"></script>
+    <script src="./app.js?v=random-feed-1" type="module"></script>
   </body>
 </html>
