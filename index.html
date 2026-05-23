@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en" data-app-version="live-handoff-2">
+<html lang="en" data-app-version="auto-launch-no-scan-1">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#07070a">
     <title>TikTok Lens Port</title>
     <link rel="manifest" href="./site.webmanifest">
-    <link rel="stylesheet" href="./styles.css?v=live-handoff-2">
+    <link rel="stylesheet" href="./styles.css?v=auto-launch-no-scan-1">
     <script async src="https://www.tiktok.com/embed.js"></script>
   </head>
   <body>
@@ -19,7 +19,7 @@
 
         <header class="topline">
           <p class="eyebrow">Meta Display Web App</p>
-          <h1 id="app-title">TikTok Scanner</h1>
+          <h1 id="app-title">TikTok Launcher</h1>
         </header>
 
         <div class="scanner-frame">
@@ -32,21 +32,21 @@
           </div>
           <canvas id="snapshot" hidden></canvas>
           <div class="camera-empty" id="cameraEmpty">
-            <strong>Scan a QR code</strong>
-            <span>or paste a TikTok link below</span>
+            <strong>TikTok Web Launcher</strong>
+            <span>opens the configured TikTok page automatically</span>
           </div>
         </div>
 
-        <div class="controls" aria-label="Scanner controls">
-          <button id="scanButton" type="button" class="primary-button">
-            Start Scan
+        <div class="controls" aria-label="Launcher controls" hidden>
+          <button id="scanButton" type="button" class="primary-button" disabled>
+            Scanner Disabled
           </button>
           <button id="stopButton" type="button" class="icon-button" aria-label="Stop camera" title="Stop camera">
             Stop
           </button>
         </div>
 
-        <form id="linkForm" class="link-form">
+        <form id="linkForm" class="link-form" hidden>
           <label for="tiktokUrl">TikTok URL</label>
           <div class="input-row">
             <input id="tiktokUrl" name="tiktokUrl" type="url" inputmode="url" autocomplete="off" placeholder="https://www.tiktok.com/@user/video/..." required>
@@ -74,6 +74,6 @@
       </section>
     </main>
 
-    <script src="./app.js?v=live-handoff-2" type="module"></script>
+    <script src="./app.js?v=auto-launch-no-scan-1" type="module"></script>
   </body>
 </html>

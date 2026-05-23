@@ -18,9 +18,11 @@ let detector;
 const tiktokHostPattern = /(^|\.)tiktok\.com$/i;
 const deepLinkParam = "tiktokUrl";
 const defaultTikTokUrl = "https://www.tiktok.com/@daroodkanool10/live";
+const scanningEnabled = false;
 const videoPathPattern = /^\/@([^/]+)\/video\/(\d+)\/?$/;
 const profilePathPattern = /^\/@([^/]+)\/?$/;
 const livePathPattern = /^\/@([^/]+)\/live\/?$/;
+const autoLaunchDelay = 1400;
 
 function setStatus(message) {
   statusText.textContent = message;
@@ -28,6 +30,21 @@ function setStatus(message) {
 
 function setError(message = "") {
   errorText.textContent = message;
+}
+
+function getErrorMessage(error, fallback) {
+  if (error && typeof error.message === "string" && error.message) {
+    return error.message;
+  }
+
+  return fallback;
+}
+
+function cameraIsAvailable() {
+  return Boolean(
+    navigator.mediaDevices &&
+      typeof navigator.mediaDevices.getUserMedia === "function"
+  );
 }
 
 function normalizeTikTokUrl(rawValue) {
@@ -92,12 +109,13 @@ function renderTikTokHandoff(tiktokUrl, username) {
   embedHost.innerHTML = `
     <div class="handoff-state">
       <strong>@${username} is live</strong>
-      <span>TikTok Live does not render through the public embed script, but it can open as the real TikTok web page for scrolling.</span>
+      <span>Opening TikTok Web for scrolling.</span>
       <a class="open-link" href="${tiktokUrl}">Browse TikTok Web</a>
       <a class="secondary-link" target="_blank" rel="noopener noreferrer" href="${tiktokUrl}">Open in new tab</a>
     </div>
   `;
-  setStatus("Web mode");
+  setStatus("Launching");
+  scheduleTikTokLaunch(tiktokUrl);
 }
 
 function renderEmbed(tiktokUrl) {
@@ -135,17 +153,24 @@ function renderEmbed(tiktokUrl) {
     embedHost.innerHTML = `
       <div class="handoff-state">
         <strong>TikTok link ready</strong>
-        <span>This TikTok URL is not a public video or profile embed, but it can open as the real TikTok web page for scrolling.</span>
+        <span>Opening TikTok Web for scrolling.</span>
         <a class="open-link" href="${safeUrl}">Browse TikTok Web</a>
         <a class="secondary-link" target="_blank" rel="noopener noreferrer" href="${safeUrl}">Open in new tab</a>
       </div>
     `;
-    setStatus("Web mode");
+    setStatus("Launching");
+    scheduleTikTokLaunch(safeUrl);
     return;
   }
 
   refreshTikTokEmbed();
   setStatus("Loaded");
+}
+
+function scheduleTikTokLaunch(tiktokUrl) {
+  window.setTimeout(() => {
+    window.location.assign(tiktokUrl);
+  }, autoLaunchDelay);
 }
 
 function loadDeepLinkedTikTok() {
@@ -179,7 +204,12 @@ async function getDetector() {
   }
 
   if (!detector) {
-    const supportedFormats = await window.BarcodeDetector.getSupportedFormats();
+    let supportedFormats = [];
+
+    if (typeof window.BarcodeDetector.getSupportedFormats === "function") {
+      supportedFormats = await window.BarcodeDetector.getSupportedFormats();
+    }
+
     if (!supportedFormats.includes("qr_code")) {
       throw new Error("QR scanning is unavailable here. Paste a TikTok URL instead.");
     }
@@ -191,35 +221,57 @@ async function getDetector() {
 }
 
 async function scanFrame() {
-  if (!stream || camera.readyState < 2) {
-    return;
-  }
+  try {
+    if (!stream || camera.readyState < 2) {
+      return;
+    }
 
-  const barcodeDetector = await getDetector();
-  const width = camera.videoWidth;
-  const height = camera.videoHeight;
+    const barcodeDetector = await getDetector();
+    const width = camera.videoWidth;
+    const height = camera.videoHeight;
 
-  if (!width || !height) {
-    return;
-  }
+    if (!width || !height) {
+      return;
+    }
 
-  snapshot.width = width;
-  snapshot.height = height;
-  const context = snapshot.getContext("2d", { willReadFrequently: true });
-  context.drawImage(camera, 0, 0, width, height);
+    snapshot.width = width;
+    snapshot.height = height;
+    const context = snapshot.getContext("2d", { willReadFrequently: true });
 
-  const codes = await barcodeDetector.detect(snapshot);
-  const hit = codes.find((code) => code.rawValue && code.rawValue.includes("tiktok.com"));
+    if (!context) {
+      throw new Error("QR scanning canvas is unavailable. Paste a TikTok URL instead.");
+    }
 
-  if (hit) {
-    renderEmbed(hit.rawValue);
+    context.drawImage(camera, 0, 0, width, height);
+
+    const codes = await barcodeDetector.detect(snapshot);
+    const hit = codes.find((code) => code.rawValue && code.rawValue.includes("tiktok.com"));
+
+    if (hit) {
+      renderEmbed(hit.rawValue);
+      stopCamera();
+    }
+  } catch (error) {
     stopCamera();
+    setStatus("Manual entry");
+    setError(getErrorMessage(error, "QR scanning stopped. Paste a TikTok URL instead."));
   }
 }
 
 async function startCamera() {
+  if (!scanningEnabled) {
+    setStatus("Launching");
+    setError("QR scanning is disabled for the glasses build.");
+    return;
+  }
+
   try {
     setError();
+
+    if (!cameraIsAvailable()) {
+      throw new Error("Camera access is unavailable in this web app container. Paste a TikTok URL instead.");
+    }
+
     await getDetector();
     stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: "environment" },
@@ -229,12 +281,10 @@ async function startCamera() {
     await camera.play();
     cameraEmpty.hidden = true;
     setStatus("Scanning");
-    scanTimer = window.setInterval(() => {
-      scanFrame().catch((error) => setError(error.message));
-    }, 700);
+    scanTimer = window.setInterval(scanFrame, 700);
   } catch (error) {
     setStatus("Manual entry");
-    setError(error.message);
+    setError(getErrorMessage(error, "Camera scanning is unavailable. Paste a TikTok URL instead."));
     stopCamera();
   }
 }
@@ -274,3 +324,8 @@ linkForm.addEventListener("submit", (event) => {
 
 window.addEventListener("pagehide", stopCamera);
 loadDeepLinkedTikTok();
+
+if (!scanningEnabled || !cameraIsAvailable() || !("BarcodeDetector" in window)) {
+  scanButton.disabled = true;
+  scanButton.textContent = "Scanner Disabled";
+}
