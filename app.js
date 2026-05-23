@@ -9,6 +9,10 @@ const previousButton = document.querySelector("#previousButton");
 const nextButton = document.querySelector("#nextButton");
 const randomButton = document.querySelector("#randomButton");
 const playButton = document.querySelector("#playButton");
+const liveStatus = document.querySelector("#liveStatus");
+const liveEvents = document.querySelector("#liveEvents");
+
+const liveEventsUrl = new URLSearchParams(window.location.search).get("events");
 
 const fallbackFeedItems = [
   {
@@ -27,6 +31,50 @@ let loadedIndex = -1;
 
 function setStatus(message) {
   statusText.textContent = message;
+}
+
+function addLiveEvent(event) {
+  const item = document.createElement("li");
+
+  if (event.type === "comment") {
+    item.textContent = `${event.user}: ${event.message}`;
+  } else if (event.type === "gift") {
+    item.textContent = `${event.user} sent ${event.gift} x${event.count}`;
+  } else if (event.type === "like") {
+    item.textContent = `${event.user} liked x${event.count}`;
+  } else if (event.type === "viewers") {
+    item.textContent = `${event.count} viewers`;
+  } else {
+    item.textContent = event.message || event.type;
+  }
+
+  liveEvents.prepend(item);
+
+  while (liveEvents.children.length > 8) {
+    liveEvents.lastElementChild.remove();
+  }
+}
+
+function connectLiveEvents() {
+  if (!liveEventsUrl || typeof EventSource !== "function") {
+    liveStatus.textContent = "Add ?events=https://your-backend/events";
+    return;
+  }
+
+  const source = new EventSource(liveEventsUrl);
+  liveStatus.textContent = "Connecting";
+
+  source.addEventListener("open", () => {
+    liveStatus.textContent = "Connected";
+  });
+
+  source.addEventListener("message", (message) => {
+    addLiveEvent(JSON.parse(message.data));
+  });
+
+  source.addEventListener("error", () => {
+    liveStatus.textContent = "Disconnected";
+  });
 }
 
 function getCurrentItem() {
@@ -167,3 +215,4 @@ async function loadFeedItems() {
 }
 
 loadFeedItems();
+connectLiveEvents();
